@@ -35,7 +35,7 @@ type Link struct {
 	CouponLinkTaoToken string
 }
 
-var tb_token = "e5b7657bb757e"
+var tb_token = "e5b7657bb757esdc"
 var pvid = "10_"
 
 func init() {
@@ -80,15 +80,10 @@ func Login() bool {
 	qrterminal.GenerateHalfBlock(M.Content, qrterminal.L, os.Stdout)
 	for {
 		if status, _ := CheckLogin(lgToken); status {
-			u, _ := url.Parse("http://*.alimama.com/")
-			for _, value := range httpdo.Autocookie.Cookies(u) {
-				if value.Name == "_tb_token_" {
-					tb_token = value.Value
-				}
-			}
+			CookiesTotb_token()
 			break
 		}
-		time.Sleep(time.Nanosecond * 1000000 * 200)
+		time.Sleep(time.Second)
 	}
 	return true
 }
@@ -115,7 +110,7 @@ func CheckLogin(lgToken string) (status bool, msg string) {
 		log.Println("返回格式不正确", string(httpbyte))
 		return
 	}
-	log.Println(matches[1])
+	//log.Println(matches[1])
 	code := gjson.Get(matches[1], "code").Int()
 	switch code {
 	case 10000:
@@ -147,19 +142,19 @@ func CheckLogin(lgToken string) (status bool, msg string) {
 func KeepLogin() {
 	op := httpdo.Default()
 	op.Url = `https://pub.alimama.com/common/getUnionPubContextInfo.json`
-	htmlbyte, err := httpdo.HttpDo(op)
+	_, err := httpdo.HttpDo(op)
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	log.Println(string(htmlbyte))
+	//log.Println(string(htmlbyte))
 	op.Url = fmt.Sprintf(`https://pub.alimama.com/report/getTbkPaymentDetails.json?startTime=%s&endTime=%s&payStatus=&queryType=1&toPage=1&perPageSize=20`, time.Now().AddDate(0, 0, -90).Format("2006-01-02"), time.Now().AddDate(0, 0, -1).Format("2006-01-02"))
-	htmlbyte, err = httpdo.HttpDo(op)
+	_, err = httpdo.HttpDo(op)
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	log.Println(string(htmlbyte))
+	//log.Println(string(htmlbyte))
 }
 func GetUnionPubContextInfo() {
 	op := httpdo.Default()
@@ -174,8 +169,8 @@ func GetUnionPubContextInfo() {
 		log.Println(gjson.Get(string(htmlbyte), "info").Get("message").String())
 		return
 	}
-	data := gjson.Get(string(htmlbyte), "data")
-	log.Println(data.String())
+	//data := gjson.Get(string(htmlbyte), "data")
+	//log.Println(data.String())
 	pvid = "10_" + gjson.Get(string(htmlbyte), "ip").String() + "_7878_" + strconv.FormatInt(time.Now().UnixNano(), 10)
 	return
 }
@@ -277,4 +272,40 @@ func GetAuctionCode(itemId, siteid, adzoneid string) (l Link) {
 }
 func token() string {
 	return "&t=" + strconv.FormatInt(time.Now().UnixNano(), 10) + "&_tb_token_=" + tb_token + "&pvid=" + pvid
+}
+
+
+func SaveLogin(){
+	httpdo.SaveCookies()
+	return 
+}
+func LoadLogin() bool {
+	httpdo.LoadCookies()
+	CookiesTotb_token()
+	if tb_token == "e5b7657bb757esdc"{
+		return false
+	}
+	return true
+}
+func IsLogin() bool {
+	op := httpdo.Default()
+	op.Url = `https://pub.alimama.com/common/getUnionPubContextInfo.json`
+	htmlbyte, err := httpdo.HttpDo(op)
+	if err != nil {
+		log.Println(err)
+		return false
+	}
+	data:=gjson.ParseBytes(htmlbyte)
+	if data.Get("date").Get("noLogin").Bool() == true {
+		return false
+	}
+	return true
+}
+func CookiesTotb_token(){
+	u, _ := url.Parse("http://*.alimama.com/")
+	for _, value := range httpdo.Autocookie.Cookies(u) {
+		if value.Name == "_tb_token_" {
+			tb_token = value.Value
+		}
+	}
 }
