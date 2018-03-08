@@ -11,8 +11,18 @@ import (
 
 func main() {
 	var err error
-
-	Login()
+	var QrcodeStr, lgt string
+	Login(&QrcodeStr, &lgt)
+	for {
+		if status, _ := CheckLogin(lgt); status {
+			CookiesTotb_token()
+			break
+		}
+		time.Sleep(time.Second)
+	}
+	GetUnionPubContextInfo()
+	SaveLogin()
+	log.Println("登录成功")
 	GetUnionPubContextInfo()
 
 	go func() {

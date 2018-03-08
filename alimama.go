@@ -5,13 +5,11 @@ import (
 	"fmt"
 	"log"
 	"net/url"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/mdp/qrterminal"
 	"github.com/tuotoo/qrcode"
 
 	httpdo "github.com/546669204/golang-http-do"
@@ -34,14 +32,20 @@ type Link struct {
 	CouponShortLinkUrl string
 	CouponLinkTaoToken string
 }
+type UserInfoModel struct {
+	Name      string
+	Pic       string
+	LastLogin string
+}
 
 var tb_token = "e5b7657bb757esdc"
 var pvid = "10_"
+var UserInfo UserInfoModel
 
 func init() {
 	httpdo.Autocookieflag = true
 }
-func Login() bool {
+func Login(QrcodeStr *string, lg *string) bool {
 	op := httpdo.Default()
 	var timestamp int64 = time.Now().UnixNano() / 1000000
 	/*
@@ -75,16 +79,13 @@ func Login() bool {
 		log.Println(err)
 		return false
 	}
+
 	M, err := qrcode.Decode(bytes.NewReader(httpbyte))
 
-	qrterminal.GenerateHalfBlock(M.Content, qrterminal.L, os.Stdout)
-	for {
-		if status, _ := CheckLogin(lgToken); status {
-			CookiesTotb_token()
-			break
-		}
-		time.Sleep(time.Second)
-	}
+	*QrcodeStr = M.Content
+	*lg = lgToken
+	//qrterminal.GenerateHalfBlock(M.Content, qrterminal.L, os.Stdout)
+
 	return true
 }
 func CheckLogin(lgToken string) (status bool, msg string) {
@@ -169,8 +170,11 @@ func GetUnionPubContextInfo() {
 		log.Println(gjson.Get(string(htmlbyte), "info").Get("message").String())
 		return
 	}
-	//data := gjson.Get(string(htmlbyte), "data")
+	data := gjson.Get(string(htmlbyte), "data")
 	//log.Println(data.String())
+	UserInfo.Name = data.Get("mmNick").String()
+	UserInfo.Pic = data.Get("avatar").String()
+	UserInfo.LastLogin = time.Now().Format("2006-01-02 15:04:05")
 	pvid = "10_" + gjson.Get(string(htmlbyte), "ip").String() + "_7878_" + strconv.FormatInt(time.Now().UnixNano(), 10)
 	return
 }
@@ -274,15 +278,14 @@ func token() string {
 	return "&t=" + strconv.FormatInt(time.Now().UnixNano(), 10) + "&_tb_token_=" + tb_token + "&pvid=" + pvid
 }
 
-
-func SaveLogin(){
+func SaveLogin() {
 	httpdo.SaveCookies()
-	return 
+	return
 }
 func LoadLogin() bool {
 	httpdo.LoadCookies()
 	CookiesTotb_token()
-	if tb_token == "e5b7657bb757esdc"{
+	if tb_token == "e5b7657bb757esdc" {
 		return false
 	}
 	return true
@@ -295,13 +298,13 @@ func IsLogin() bool {
 		log.Println(err)
 		return false
 	}
-	data:=gjson.ParseBytes(htmlbyte)
+	data := gjson.ParseBytes(htmlbyte)
 	if data.Get("date").Get("noLogin").Bool() == true {
 		return false
 	}
 	return true
 }
-func CookiesTotb_token(){
+func CookiesTotb_token() {
 	u, _ := url.Parse("http://*.alimama.com/")
 	for _, value := range httpdo.Autocookie.Cookies(u) {
 		if value.Name == "_tb_token_" {
