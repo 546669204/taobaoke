@@ -37,6 +37,10 @@ type UserInfoModel struct {
 	Pic       string
 	LastLogin string
 }
+type SelfAdzone struct {
+	Siteid   string
+	Adzoneid []string
+}
 
 var tb_token = "e5b7657bb757esdc"
 var pvid = "10_"
@@ -215,25 +219,34 @@ func Search(keyword string) (product Products) {
 
 }
 
-func NewSelfAdzone2(itemId string) (siteid, adzoneid string) {
+func NewSelfAdzone2(itemId string) []SelfAdzone {
 	op := httpdo.Default()
 	op.Url = "http://pub.alimama.com/common/adzone/newSelfAdzone2.json?tag=29&itemId=" + itemId + "&blockId=" + token()
 	htmlbyte, err := httpdo.HttpDo(op)
 	if err != nil {
 		log.Println(err)
-		return
+		return nil
 	}
 	ok := gjson.Get(string(htmlbyte), "ok")
 	if !ok.Exists() || !ok.Bool() {
 		log.Println(gjson.Get(string(htmlbyte), "info").Get("message").String())
-		return
+		return nil
 	}
 
 	data := gjson.Get(string(htmlbyte), "data")
 	array := data.Get("otherAdzones").Array()
-	siteid = array[0].Get("id").String()
-	adzoneid = array[0].Get("sub").Array()[0].Get("id").String()
-	return
+	var ret []SelfAdzone
+	for _, value := range array {
+		var adzone []string
+		for _, value2 := range value.Get("sub").Array() {
+			ad := value2.Get("id").String()
+			adzone = append(adzone, ad)
+		}
+		var tmp = SelfAdzone{Siteid: value.Get("id").String(), Adzoneid: adzone}
+		ret = append(ret, tmp)
+	}
+
+	return ret
 }
 
 func SelfAdzoneCreate(siteid, adzoneid string) {
@@ -299,7 +312,7 @@ func IsLogin() bool {
 		return false
 	}
 	data := gjson.ParseBytes(htmlbyte)
-	if data.Get("date").Get("noLogin").Bool() == true {
+	if data.Get("data").Get("noLogin").Bool() == true {
 		return false
 	}
 	return true

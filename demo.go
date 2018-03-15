@@ -52,7 +52,13 @@ func http112233(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Println(p)
-	a, b := NewSelfAdzone2(p.ID)
+	sa := NewSelfAdzone2(p.ID)
+	if sa == nil {
+		log.Println("暂无推广位")
+		return
+	}
+	a := sa[0].Siteid
+	b := sa[0].Adzoneid[0]
 	SelfAdzoneCreate(a, b)
 	l := GetAuctionCode(p.ID, a, b)
 	log.Println(l)
