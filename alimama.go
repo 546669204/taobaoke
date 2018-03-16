@@ -325,3 +325,30 @@ func CookiesTotb_token() {
 		}
 	}
 }
+
+func Download(startTime, endTime string) []byte {
+	op := httpdo.Default()
+	op.Url = fmt.Sprintf("http://pub.alimama.com/report/getTbkPaymentDetails.json?queryType=1&payStatus=&DownloadID=DOWNLOAD_REPORT_INCOME_NEW&startTime=%s&endTime=%s", startTime, endTime)
+	htmlbyte, err := httpdo.HttpDo(op)
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+	return htmlbyte
+}
+
+func MediaRpt(startTime, endTime string) []byte {
+	/*
+		http://pub.alimama.com/report/mediaRpt.json?gcId=&siteType=&siteId=&startTime=2018-03-09&endTime=2018-03-15&t=1521185338929&pvid=&_tb_token_=7b703b3b7ee13&_input_charset=utf-8
+
+		{"data":{"datas":[{"siteId":null,"thedate":"2018-03-09","siteName":null,"alipayNum":0,"rec":0.00,"mixClick":0,"alipayRec":0.00,"mixPv":null,"mixCtr":null,"mixEcpm":null,"alipayAmt":null,"mixRphc":"--"},{"siteId":null,"thedate":"2018-03-10","siteName":null,"alipayNum":0,"rec":0.00,"mixClick":0,"alipayRec":0.00,"mixPv":null,"mixCtr":null,"mixEcpm":null,"alipayAmt":null,"mixRphc":"--"},{"siteId":null,"thedate":"2018-03-11","siteName":null,"alipayNum":0,"rec":0.09,"mixClick":0,"alipayRec":0.00,"mixPv":null,"mixCtr":null,"mixEcpm":null,"alipayAmt":null,"mixRphc":"--"},{"siteId":null,"thedate":"2018-03-12","siteName":null,"alipayNum":0,"rec":0.00,"mixClick":0,"alipayRec":0.00,"mixPv":null,"mixCtr":null,"mixEcpm":null,"alipayAmt":null,"mixRphc":"--"},{"siteId":null,"thedate":"2018-03-13","siteName":null,"alipayNum":0,"rec":0.00,"mixClick":0,"alipayRec":0.00,"mixPv":null,"mixCtr":null,"mixEcpm":null,"alipayAmt":null,"mixRphc":"--"},{"siteId":null,"thedate":"2018-03-14","siteName":null,"alipayNum":1,"rec":0.00,"mixClick":2,"alipayRec":0.72,"mixPv":null,"mixCtr":null,"mixEcpm":null,"alipayAmt":null,"mixRphc":"0.00"},{"siteId":null,"thedate":"2018-03-15","siteName":null,"alipayNum":0,"rec":0.00,"mixClick":0,"alipayRec":0.00,"mixPv":null,"mixCtr":null,"mixEcpm":null,"alipayAmt":null,"mixRphc":"--"}],"webSites":[],"query":{"siteId":null,"siteIds":null,"startTime":"2018-03-09","endTime":"2018-03-15","pubId":112672261,"length":10,"offset":0,"pageNo":0,"pageSize":0,"toPage":0,"perPageSize":0,"startRow":0},"apps":[],"countMap":{"totalRec":0.09,"totalAlipayNum":1,"totalAlipayRec":0.72,"totalMixClick":2},"softs":[],"guides":[{"name":"亲朋好友推","id":42520773},{"name":"爱分享(手机客户端专享)_112672261","id":42488830}],"allMedias":[{"name":"亲朋好友推","id":42520773},{"name":"爱分享(手机客户端专享)_112672261","id":42488830}]},"info":{"message":null,"ok":true},"ok":true,"invalidKey":null}
+	*/
+	op := httpdo.Default()
+	op.Url = fmt.Sprintf("http://pub.alimama.com/report/mediaRpt.json?gcId=&siteType=&siteId=&startTime=%s&endTime=%s&t=%d&pvid=&_tb_token_=%s&_input_charset=utf-8", startTime, endTime, time.Now().Unix(), tb_token)
+	htmlbyte, err := httpdo.HttpDo(op)
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+	return htmlbyte
+}
