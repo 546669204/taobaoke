@@ -6,24 +6,34 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"testing"
 	"time"
+
+	httpdo "github.com/546669204/golang-http-do"
 )
 
-func main() {
+func TestMain(t *testing.T) {
 	var err error
-	var QrcodeStr, lgt string
-	Login(&QrcodeStr, &lgt)
-	for {
-		if status, _ := CheckLogin(lgt); status {
-			CookiesTotb_token()
-			break
+	//var QrcodeStr, lgt string
+	httpdo.Debug = true
+
+	/*
+		由于协议变更 失效
+		Login(&QrcodeStr, &lgt)
+		qrterminal.GenerateHalfBlock(QrcodeStr, qrterminal.L, os.Stdout)
+		for {
+			if status, _ := CheckLogin(lgt); status {
+				CookiesTotb_token()
+				break
+			}
+			time.Sleep(time.Second)
 		}
-		time.Sleep(time.Second)
-	}
+	*/
+	//使用浏览器打开 不受协议影响
+	BrowserLogin()
+
 	GetUnionPubContextInfo()
 	SaveLogin()
-	log.Println("登录成功")
-	GetUnionPubContextInfo()
 
 	go func() {
 		//启动线程,定时访问alimam 保持cookies

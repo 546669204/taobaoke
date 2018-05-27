@@ -2,14 +2,21 @@ package taobaoke
 
 import (
 	"bytes"
+	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/url"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/chromedp/cdproto/cdp"
+	"github.com/chromedp/cdproto/network"
+	"github.com/chromedp/chromedp"
 	"github.com/tuotoo/qrcode"
 
 	httpdo "github.com/546669204/golang-http-do"
@@ -41,6 +48,22 @@ type SelfAdzone struct {
 	Siteid   string
 	Adzoneid []string
 }
+type Entry struct {
+	//use form github.com/546669204/golang-http-do/cookies.go type entry
+	Name          string
+	Value         string
+	Domain        string
+	Path          string
+	Secure        bool
+	HttpOnly      bool
+	Persistent    bool
+	HostOnly      bool
+	Expires       time.Time
+	Creation      time.Time
+	LastAccess    time.Time
+	Updated       time.Time
+	CanonicalHost string
+}
 
 var tb_token = "e5b7657bb757esdc"
 var pvid = "10_"
@@ -57,9 +80,38 @@ func Login(QrcodeStr *string, lg *string) bool {
 
 		(function(){jsonp31({"success":true,"message":"null","url":"//img.alicdn.com/tfscom/TB1m2dpXwKTBuNkSne1wu1JoXXa.png","lgToken":"de99458ca8b8ea36121b060b0366ba45","adToken":"fbfa92d66fc980a2a1a4a20dac55a4fa"});})();
 	*/
-	op.Url = fmt.Sprintf(`https://qrlogin.taobao.com/qrcodelogin/generateQRCode4Login.do?from=alimama&appkey=00000000&_ksTS=%d_30&callback=jsonp31`, timestamp)
-	op.Header = fmt.Sprintf("authority:qrlogin.taobao.com\nmethod:GET\npath:/qrcodelogin/generateQRCode4Login.do?from=alimama&appkey=00000000&_ksTS=%d_30&callback=jsonp31\nscheme:https", timestamp)
+	/*
+	   {"xv":"3.3.7","xt":"C1456801506861066291436551527262916933767","etf":"u","xa":"taobao_login","siteId":"","uid":"","eml":"AA","etid":"","esid":"","type":"pc","nce":true,"plat":"Win32","nacn":"Mozilla","nan":"Netscape","nlg":"zh-CN","sw":1366,"sh":768,"saw":1366,"sah":728,"bsw":1349,"bsh":919,"eloc":"https%3A%2F%2Flogin.taobao.com%2Fmember%2Flogin.jhtml","etz":480,"ett":1527262917061,"ecn":"00d28072d163458ac4e5f76257988ce89e70c44e","eca":"B5RVD3WPjnkCAWq6GBzzSjQY","est":2,"xs":"2BA477700510A7DFDD385CBE84379362010373F6C7D0D0ECA1391732D5273DC933A7BE54B94CA04CCD43AD3E795C914CE03B127657950E82D778D535531B3C4D","ms":"1147","erd":"default,communications,4535fcec252bd8f8d01cec8f5d24e8066556152d2ee086f85f9aaf47e35c0def,c8fb49d17fa46987570d448e09d428f03c0b3d44680d89eb4445c75d07011680,default,communications,285726e33527b95a362ad5e680c4142cb553d4cc51bed714f108b27790d9d0fa","cacheid":"7f0abc57f372979a","xh":"","ips":"192.168.0.105","epl":4,"ep":"28d732090cbbaf0e0f09c3c1ad8f6b8c5ae59712","epls":"C370c307f4aca7858493dfe322254e5cb438be944,N0fcd6e18ff6df74f98a698b7f6b6d838a6c11e69,W31cc12636d0f0ccb723b965c719df6faa8883435","esl":false}
+	*/
+	op = httpdo.Default()
+	op.Url = fmt.Sprintf(`https://login.taobao.com/member/login.jhtml?redirectURL=https%%3A%%2F%%2Fwww.taobao.com%%2F`)
 	httpbyte, err := httpdo.HttpDo(op)
+	if err != nil {
+		log.Println(err)
+		return false
+	}
+	op = httpdo.Default()
+	op.Url = fmt.Sprintf(`https://ynuf.alipay.com/uid`)
+	httpbyte, err = httpdo.HttpDo(op)
+	if err != nil {
+		log.Println(err)
+		return false
+	}
+	cacheid := strings.Split(string(httpbyte), "\"")[1]
+	op = httpdo.Default()
+	op.Url = fmt.Sprintf(`https://ynuf.alipay.com/service/um.json`)
+	op.Method = "POST"
+	op.Data = `data=ENCODE~~V01~~` + base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf(`{"xv":"3.3.7","xt":"C1456801506861066291436551527262916933767","etf":"u","xa":"taobao_login","siteId":"","uid":"","eml":"AA","etid":"","esid":"","type":"pc","nce":true,"plat":"Win32","nacn":"Mozilla","nan":"Netscape","nlg":"zh-CN","sw":1366,"sh":768,"saw":1366,"sah":728,"bsw":1349,"bsh":919,"eloc":"https%%3A%%2F%%2Flogin.taobao.com%%2Fmember%%2Flogin.jhtml","etz":480,"ett":%d,"ecn":"00d28072d163458ac4e5f76257988ce89e70c44e","eca":"B5RVD3WPjnkCAWq6GBzzSjQY","est":2,"xs":"2BA477700510A7DFDD385CBE84379362010373F6C7D0D0ECA1391732D5273DC933A7BE54B94CA04CCD43AD3E795C914CE03B127657950E82D778D535531B3C4D","ms":"1147","erd":"default,communications,4535fcec252bd8f8d01cec8f5d24e8066556152d2ee086f85f9aaf47e35c0def,c8fb49d17fa46987570d448e09d428f03c0b3d44680d89eb4445c75d07011680,default,communications,285726e33527b95a362ad5e680c4142cb553d4cc51bed714f108b27790d9d0fa","cacheid":"%s","xh":"","ips":"192.168.0.105","epl":4,"ep":"28d732090cbbaf0e0f09c3c1ad8f6b8c5ae59712","epls":"C370c307f4aca7858493dfe322254e5cb438be944,N0fcd6e18ff6df74f98a698b7f6b6d838a6c11e69,W31cc12636d0f0ccb723b965c719df6faa8883435","esl":false}`, timestamp, cacheid)))
+	op.Header = "Content-Type:application/x-www-form-urlencoded; charset=UTF-8"
+	httpbyte, err = httpdo.HttpDo(op)
+	if err != nil {
+		log.Println(err)
+		return false
+	}
+	op = httpdo.Default()
+	op.Url = fmt.Sprintf(`https://qrlogin.taobao.com/qrcodelogin/generateQRCode4Login.do?from=alimama&appkey=00000000&_ksTS=%d_30&callback=jsonp31&umid_token=%s`, timestamp, gjson.ParseBytes(httpbyte).Get("tn").String())
+	op.Header = fmt.Sprintf("authority:qrlogin.taobao.com\nmethod:GET\npath:/qrcodelogin/generateQRCode4Login.do?from=alimama&appkey=00000000&_ksTS=%d_30&callback=jsonp31\nscheme:https", timestamp)
+	httpbyte, err = httpdo.HttpDo(op)
 	if err != nil {
 		log.Println(err)
 		return false
@@ -92,6 +144,111 @@ func Login(QrcodeStr *string, lg *string) bool {
 
 	return true
 }
+func BrowserLogin() {
+	var err error
+
+	// 创建内容
+	ctxt, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// 创建chrome实例
+	c, err := chromedp.New(ctxt)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// 运行任务
+
+	// 导航
+	err = c.Run(ctxt, chromedp.Navigate(`https://www.alimama.com/member/login.htm?forward=http%3A%2F%2Fpub.alimama.com%2Fmyunion.htm%3Fspm%3Da219t.7900221%2F1.a214tr8.2.446dfb5b8vg0Sx`))
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = c.Run(ctxt, getcookies())
+	if err != nil {
+		log.Fatal(err)
+	}
+	var site string
+	for {
+		err = c.Run(ctxt, chromedp.Location(&site))
+		if err != nil {
+			log.Fatal(err)
+		}
+		// 循环判断网址是否是登陆成功后的网址
+		if string([]byte(site)[:34]) == "http://pub.alimama.com/myunion.htm" {
+			break
+		}
+		time.Sleep(3 * time.Second)
+	}
+	err = c.Run(ctxt, getcookies())
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// 关闭浏览器
+	err = c.Shutdown(ctxt)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// 等待浏览器完全关闭
+	err = c.Wait()
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+func getcookies() chromedp.Tasks {
+	return chromedp.Tasks{
+		chromedp.ActionFunc(func(ctxt context.Context, h cdp.Executor) error {
+			cookies, err := network.GetAllCookies().Do(ctxt, h)
+			if err != nil {
+				return err
+			}
+
+			cookiestr := ""
+			var b map[string]map[string]Entry
+			b = make(map[string]map[string]Entry)
+			for _, c := range cookies {
+				//if c.Domain == ".alimama.com" { //筛选作用域
+				cookiestr += c.Name + "=" + c.Value + ";"
+				var d Entry
+				domain := c.Domain
+				CanonicalHost := c.Domain
+				if domain[:1] == "." {
+					domain = domain[1:]
+					CanonicalHost = "www" + CanonicalHost
+				}
+
+				rootdomain := domain
+				domaina := strings.Split(domain, ".")
+				if len(domaina) == 3 {
+					rootdomain = domaina[1] + "." + domaina[2]
+				}
+				d.Domain = domain
+				d.Path = c.Path
+				d.Name = c.Name
+				d.Value = c.Value
+				d.CanonicalHost = CanonicalHost
+				expires, _ := time.Parse("2006-01-02 15:04:05", "9999-01-02 15:04:05")
+				d.Expires = expires
+				if _, ok := b[rootdomain]; !ok {
+					b[rootdomain] = make(map[string]Entry)
+				}
+				b[rootdomain][domain+":/:"+c.Name] = d
+			}
+
+			asd, _ := json.Marshal(b)
+			file, err := os.OpenFile("cookies.data", os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0)
+			if err != nil {
+				log.Println(err)
+			}
+			file.Write(asd)
+			file.Close()
+			httpdo.LoadCookies()
+			return nil
+		}),
+	}
+}
 func CheckLogin(lgToken string) (status bool, msg string) {
 	status = false
 	msg = ""
@@ -102,8 +259,8 @@ func CheckLogin(lgToken string) (status bool, msg string) {
 
 		(function(){jsonp86({"code":"10000","message":"login start state","success":true});})();
 	*/
-	op.Url = fmt.Sprintf(`https://qrlogin.taobao.com/qrcodelogin/qrcodeLoginCheck.do?lgToken=%s&defaulturl=http%3A%2F%2Flogin.taobao.com%2Fmember%2Ftaobaoke%2Flogin.htm%3Fis_login%3D1&_ksTS=%d_30&callback=jsonp31`, lgToken, timestamp)
-	op.Header = fmt.Sprintf("authority:qrlogin.taobao.com\nmethod:GET\npath:/qrcodelogin/qrcodeLoginCheck.do?lgToken=%s&defaulturl=http%3A%2F%2Flogin.taobao.com%2Fmember%2Ftaobaoke%2Flogin.htm%3Fis_login%3D1&_ksTS=%d_30&callback=jsonp31\nscheme:https", lgToken, timestamp)
+	op.Url = fmt.Sprintf(`https://qrlogin.taobao.com/qrcodelogin/qrcodeLoginCheck.do?lgToken=%s&defaulturl=http%%3A%%2F%%2Flogin.taobao.com%%2Fmember%%2Ftaobaoke%%2Flogin.htm%%3Fis_login%%3D1&_ksTS=%d_30&callback=jsonp31`, lgToken, timestamp)
+	op.Header = fmt.Sprintf("authority:qrlogin.taobao.com\nmethod:GET\npath:/qrcodelogin/qrcodeLoginCheck.do?lgToken=%s&defaulturl=http%%3A%%2F%%2Flogin.taobao.com%%2Fmember%%2Ftaobaoke%%2Flogin.htm%%3Fis_login%%3D1&_ksTS=%d_30&callback=jsonp31\nscheme:https", lgToken, timestamp)
 	httpbyte, err := httpdo.HttpDo(op)
 	if err != nil {
 		log.Println(err)
@@ -153,12 +310,12 @@ func KeepLogin() {
 		return
 	}
 	//log.Println(string(htmlbyte))
-	op.Url = fmt.Sprintf(`https://pub.alimama.com/report/getTbkPaymentDetails.json?startTime=%s&endTime=%s&payStatus=&queryType=1&toPage=1&perPageSize=20`, time.Now().AddDate(0, 0, -90).Format("2006-01-02"), time.Now().AddDate(0, 0, -1).Format("2006-01-02"))
+	/*op.Url = fmt.Sprintf(`https://pub.alimama.com/report/getTbkPaymentDetails.json?startTime=%s&endTime=%s&payStatus=&queryType=1&toPage=1&perPageSize=20`, time.Now().AddDate(0, 0, -90).Format("2006-01-02"), time.Now().AddDate(0, 0, -1).Format("2006-01-02"))
 	_, err = httpdo.HttpDo(op)
 	if err != nil {
 		log.Println(err)
 		return
-	}
+	}*/
 	//log.Println(string(htmlbyte))
 }
 func GetUnionPubContextInfo() {
@@ -175,7 +332,7 @@ func GetUnionPubContextInfo() {
 		return
 	}
 	data := gjson.Get(string(htmlbyte), "data")
-	//log.Println(data.String())
+	log.Println(data.String())
 	UserInfo.Name = data.Get("mmNick").String()
 	UserInfo.Pic = data.Get("avatar").String()
 	UserInfo.LastLogin = time.Now().Format("2006-01-02 15:04:05")
