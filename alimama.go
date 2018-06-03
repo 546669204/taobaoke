@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/url"
 	"os"
@@ -14,8 +15,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/chromedp/chromedp/runner"
+
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"
+	"github.com/chromedp/cdproto/page"
+	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/chromedp"
 	"github.com/tuotoo/qrcode"
 
@@ -68,9 +73,15 @@ type Entry struct {
 var tb_token = "e5b7657bb757esdc"
 var pvid = "10_"
 var UserInfo UserInfoModel
+var conTextMap map[string]int64
+var c *chromedp.CDP
+var ctxt context.Context
+var cancel context.CancelFunc
+var browserRun int
 
 func init() {
 	httpdo.Autocookieflag = true
+	browserRun = 0
 }
 func Login(QrcodeStr *string, lg *string) bool {
 	op := httpdo.Default()
@@ -144,57 +155,98 @@ func Login(QrcodeStr *string, lg *string) bool {
 
 	return true
 }
-func BrowserLogin() {
+func BrowserLogin() string {
 	var err error
 
+	conTextMap = make(map[string]int64)
 	// 创建内容
-	ctxt, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctxt, cancel = context.WithCancel(context.Background())
+	//defer cancel()
 
 	// 创建chrome实例
-	c, err := chromedp.New(ctxt)
+	c, err = chromedp.New(ctxt, chromedp.WithRunnerOptions(
+		runner.Flag("headless", true),
+		runner.Flag("disable-gpu", true),
+		runner.Flag("no-first-run", true),
+		runner.Flag("no-sandbox", true),
+		runner.Flag("no-default-browser-check", true),
+		//runner.Flag("disable-web-security", true), //安全策略 跨域之类
+		runner.StartURL(`https://www.alimama.com/member/login.htm?forward=http%3A%2F%2Fpub.alimama.com%2Fmyunion.htm%3Fspm%3Da219t.7900221%2F1.a214tr8.2.446dfb5b8vg0Sx`),
+	), chromedp.WithLog(BrowserHandler))
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("chromedp.New", err)
 	}
 
 	// 运行任务
 
-	// 导航
-	err = c.Run(ctxt, chromedp.Navigate(`https://www.alimama.com/member/login.htm?forward=http%3A%2F%2Fpub.alimama.com%2Fmyunion.htm%3Fspm%3Da219t.7900221%2F1.a214tr8.2.446dfb5b8vg0Sx`))
+	err = c.Run(ctxt, getQrcode())
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("getQrcode", err)
 	}
-	err = c.Run(ctxt, getcookies())
-	if err != nil {
-		log.Fatal(err)
-	}
-	var site string
-	for {
-		err = c.Run(ctxt, chromedp.Location(&site))
-		if err != nil {
-			log.Fatal(err)
-		}
-		// 循环判断网址是否是登陆成功后的网址
-		if string([]byte(site)[:34]) == "http://pub.alimama.com/myunion.htm" {
-			break
-		}
-		time.Sleep(3 * time.Second)
-	}
-	err = c.Run(ctxt, getcookies())
-	if err != nil {
-		log.Fatal(err)
+	imgbyte, _ := ioutil.ReadFile("123.png")
+	browserRun = 1
+	return base64.StdEncoding.EncodeToString(imgbyte)
+}
+func BrowserHandler(a string, b ...interface{}) {
+	log.Printf(a, b...)
+	data := gjson.Parse(b[0].(string))
+	if "Runtime.executionContextCreated" == data.Get("method").String() {
+		conTextMap[data.Get("params").Get("context").Get("auxData").Get("frameId").String()] = data.Get("params").Get("context").Get("id").Int()
 	}
 
-	// 关闭浏览器
-	err = c.Shutdown(ctxt)
-	if err != nil {
-		log.Fatal(err)
-	}
+}
+func getQrcode() chromedp.Tasks {
+	var img []byte
+	return chromedp.Tasks{
+		chromedp.WaitVisible(`.mm-logo`, chromedp.ByQuery),
+		chromedp.WaitReady("body", chromedp.ByQuery),
+		chromedp.ActionFunc(func(z context.Context, h cdp.Executor) error {
+			for {
+				frameTree, err := page.GetFrameTree().Do(z, h)
 
-	// 等待浏览器完全关闭
-	err = c.Wait()
-	if err != nil {
-		log.Fatal(err)
+				if err != nil {
+					log.Println(err.Error())
+				}
+				for _, v := range frameTree.ChildFrames {
+					if v.Frame.Name != "taobaoLoginIfr" {
+						continue
+					}
+					cid, ok := conTextMap[string(v.Frame.ID)]
+					if !ok {
+						continue
+					}
+					res, _, err := runtime.Evaluate(`
+							function test (){
+								if (!document.querySelector("#J_QRCodeImg img")){return 0}
+								if (document.querySelector("#J_QRCodeImg img").naturalWidth==0){return 0}
+								if (document.querySelector("#J_QRCodeImg img").naturalHeight==0){return 0}
+								if (document.querySelector("#J_QRCodeImg img").width==0){return 0}
+								if (document.querySelector("#J_QRCodeImg img").height==0){return 0}
+								var img = document.querySelector("#J_QRCodeImg img");
+								return '{"width":'+img.width+',"height":'+img.height+'}'
+							}
+							test()
+						`).WithContextID(runtime.ExecutionContextID(cid)).Do(z, h)
+
+					if err != nil {
+						log.Println(err.Error())
+					}
+					if string(res.Value) == "0" {
+						continue
+					}
+					//
+					log.Println("二维码输出成功", string(res.Value), v.Frame.Name)
+					goto ForEnd
+				}
+				time.Sleep(3 * time.Second)
+			}
+		ForEnd:
+			return nil
+		}),
+		chromedp.Screenshot(".panel iframe", &img, chromedp.ByQuery),
+		chromedp.ActionFunc(func(z context.Context, h cdp.Executor) error {
+			return ioutil.WriteFile("123.png", img, 0644)
+		}),
 	}
 }
 func getcookies() chromedp.Tasks {
@@ -248,6 +300,50 @@ func getcookies() chromedp.Tasks {
 			return nil
 		}),
 	}
+}
+func BrowserCheckLogin() (status bool, msg string) {
+	var site string
+	var err error
+	status = false
+	msg = ""
+	if browserRun == 0 {
+		msg = "还未启动浏览器"
+		return
+	}
+	err = c.Run(ctxt, chromedp.Location(&site))
+	if err != nil {
+		log.Fatal(err)
+	}
+	// 循环判断网址是否是登陆成功后的网址
+	if string([]byte(site)[:34]) == "http://pub.alimama.com/myunion.htm" {
+		err = c.Run(ctxt, getcookies())
+		if err != nil {
+			log.Fatal(err)
+		}
+		browserRun = 2
+		// 关闭浏览器
+		err = c.Shutdown(ctxt)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// 等待浏览器完全关闭
+		err = c.Wait()
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer cancel()
+	}
+
+	if browserRun == 1 {
+		msg = "请扫描二维码"
+	}
+	if browserRun == 2 {
+		status = true
+		msg = "登录成功"
+	}
+	return
+
 }
 func CheckLogin(lgToken string) (status bool, msg string) {
 	status = false
