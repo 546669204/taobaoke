@@ -70,6 +70,8 @@ type Entry struct {
 	CanonicalHost string
 }
 
+var ChromeUserDataDIR = ""
+
 var tb_token = "e5b7657bb757esdc"
 var pvid = "10_"
 var UserInfo UserInfoModel
@@ -162,15 +164,20 @@ func BrowserLogin() string {
 	// 创建内容
 	ctxt, cancel = context.WithCancel(context.Background())
 	//defer cancel()
-
+	var userdatadir runner.CommandLineOption
+	if len(ChromeUserDataDIR) > 0 {
+		userdatadir = runner.Flag("user-data-dir", ChromeUserDataDIR)
+	}
 	// 创建chrome实例
 	c, err = chromedp.New(ctxt, chromedp.WithRunnerOptions(
-		runner.Flag("headless", true),
+		// runner.Flag("headless", true),
 		runner.Flag("disable-gpu", true),
 		runner.Flag("no-first-run", true),
 		runner.Flag("no-sandbox", true),
 		runner.Flag("no-default-browser-check", true),
-		//runner.Flag("disable-web-security", true), //安全策略 跨域之类
+		// runner.Flag("disable-popup-blocking", false),                                 //关闭弹窗拦截
+		// runner.Flag("disable-web-security", true),                                    //安全策略 跨域之类
+		userdatadir, //安全策略 跨域之类
 		runner.StartURL(`https://www.alimama.com/member/login.htm?forward=http%3A%2F%2Fpub.alimama.com%2Fmyunion.htm%3Fspm%3Da219t.7900221%2F1.a214tr8.2.446dfb5b8vg0Sx`),
 	), chromedp.WithLog(BrowserHandler))
 	if err != nil {
@@ -243,7 +250,7 @@ func getQrcode() chromedp.Tasks {
 		ForEnd:
 			return nil
 		}),
-		chromedp.Screenshot(".panel iframe", &img, chromedp.ByQuery),
+		chromedp.Screenshot(".panel iframe[name='taobaoLoginIfr']", &img, chromedp.ByQuery),
 		chromedp.ActionFunc(func(z context.Context, h cdp.Executor) error {
 			return ioutil.WriteFile("123.png", img, 0644)
 		}),
@@ -315,7 +322,8 @@ func BrowserCheckLogin() (status bool, msg string) {
 		log.Fatal(err)
 	}
 	// 循环判断网址是否是登陆成功后的网址
-	if string([]byte(site)[:34]) == "http://pub.alimama.com/myunion.htm" {
+	site = strings.Replace(site, "https://", "http://", -1)
+	if site[:34] == "http://pub.alimama.com/myunion.htm" {
 		err = c.Run(ctxt, getcookies())
 		if err != nil {
 			log.Fatal(err)
