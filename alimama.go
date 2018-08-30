@@ -178,7 +178,6 @@ func BrowserLogin() string {
 		// runner.Flag("disable-popup-blocking", false),                                 //关闭弹窗拦截
 		// runner.Flag("disable-web-security", true),                                    //安全策略 跨域之类
 		userdatadir, //安全策略 跨域之类
-		runner.StartURL(`https://www.alimama.com/member/login.htm?forward=http%3A%2F%2Fpub.alimama.com%2Fmyunion.htm%3Fspm%3Da219t.7900221%2F1.a214tr8.2.446dfb5b8vg0Sx`),
 	), chromedp.WithLog(BrowserHandler))
 	if err != nil {
 		log.Fatal("chromedp.New", err)
@@ -205,6 +204,7 @@ func BrowserHandler(a string, b ...interface{}) {
 func getQrcode() chromedp.Tasks {
 	var img []byte
 	return chromedp.Tasks{
+		chromedp.Navigate(`https://www.alimama.com/member/login.htm?forward=http%3A%2F%2Fpub.alimama.com%2Fmyunion.htm%3Fspm%3Da219t.7900221%2F1.a214tr8.2.446dfb5b8vg0Sx`),
 		chromedp.WaitVisible(`.mm-logo`, chromedp.ByQuery),
 		chromedp.WaitReady("body", chromedp.ByQuery),
 		chromedp.ActionFunc(func(z context.Context, h cdp.Executor) error {
