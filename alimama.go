@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -164,21 +165,30 @@ func BrowserLogin() string {
 	// 创建内容
 	ctxt, cancel = context.WithCancel(context.Background())
 	//defer cancel()
-	var userdatadir runner.CommandLineOption
 	if len(ChromeUserDataDIR) > 0 {
-		userdatadir = runner.Flag("user-data-dir", ChromeUserDataDIR)
+		c, err = chromedp.New(ctxt, chromedp.WithRunnerOptions(
+			runner.Flag("headless", true),
+			runner.Flag("disable-gpu", true),
+			runner.Flag("no-first-run", true),
+			runner.Flag("no-sandbox", true),
+			runner.Flag("no-default-browser-check", true),
+			// runner.Flag("disable-popup-blocking", false),                                 //关闭弹窗拦截
+			// runner.Flag("disable-web-security", true),                                    //安全策略 跨域之类
+			runner.Flag("user-data-dir", ChromeUserDataDIR),
+		), chromedp.WithLog(BrowserHandler))
+	} else {
+		c, err = chromedp.New(ctxt, chromedp.WithRunnerOptions(
+			runner.Flag("headless", true),
+			runner.Flag("disable-gpu", true),
+			runner.Flag("no-first-run", true),
+			runner.Flag("no-sandbox", true),
+			runner.Flag("no-default-browser-check", true),
+			// runner.Flag("disable-popup-blocking", false),                                 //关闭弹窗拦截
+			// runner.Flag("disable-web-security", true),                                    //安全策略 跨域之类
+		), chromedp.WithLog(BrowserHandler))
 	}
 	// 创建chrome实例
-	c, err = chromedp.New(ctxt, chromedp.WithRunnerOptions(
-		// runner.Flag("headless", true),
-		runner.Flag("disable-gpu", true),
-		runner.Flag("no-first-run", true),
-		runner.Flag("no-sandbox", true),
-		runner.Flag("no-default-browser-check", true),
-		// runner.Flag("disable-popup-blocking", false),                                 //关闭弹窗拦截
-		// runner.Flag("disable-web-security", true),                                    //安全策略 跨域之类
-		userdatadir, //安全策略 跨域之类
-	), chromedp.WithLog(BrowserHandler))
+
 	if err != nil {
 		log.Fatal("chromedp.New", err)
 	}
@@ -195,9 +205,11 @@ func BrowserLogin() string {
 }
 func BrowserHandler(a string, b ...interface{}) {
 	log.Printf(a, b...)
-	data := gjson.Parse(b[0].(string))
-	if "Runtime.executionContextCreated" == data.Get("method").String() {
-		conTextMap[data.Get("params").Get("context").Get("auxData").Get("frameId").String()] = data.Get("params").Get("context").Get("id").Int()
+	if len(b) >= 1 && reflect.TypeOf(b[0]).String() == "string" {
+		data := gjson.Parse(b[0].(string))
+		if "Runtime.executionContextCreated" == data.Get("method").String() {
+			conTextMap[data.Get("params").Get("context").Get("auxData").Get("frameId").String()] = data.Get("params").Get("context").Get("id").Int()
+		}
 	}
 
 }
