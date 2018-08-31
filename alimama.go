@@ -236,6 +236,7 @@ func getQrcode() chromedp.Tasks {
 					}
 					res, _, err := runtime.Evaluate(`
 							function test (){
+								document.querySelector("#J_LoginBox").className.indexOf("module-quick") == -1 && (document.querySelector(".login-switch .quick").click());
 								if (!document.querySelector("#J_QRCodeImg img")){return 0}
 								if (document.querySelector("#J_QRCodeImg img").naturalWidth==0){return 0}
 								if (document.querySelector("#J_QRCodeImg img").naturalHeight==0){return 0}
