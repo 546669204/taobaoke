@@ -336,7 +336,7 @@ func BrowserCheckLogin() (status bool, msg string) {
 	}
 	// 循环判断网址是否是登陆成功后的网址
 	site = strings.Replace(site, "https://", "http://", -1)
-	if site[:34] == "http://pub.alimama.com/myunion.htm" {
+	if site[:34] == "http://pub.alimama.com/myunion.htm" || site[:35] == "https://pub.alimama.com/myunion.htm" {
 		err = c.Run(ctxt, getcookies())
 		if err != nil {
 			log.Fatal(err)
