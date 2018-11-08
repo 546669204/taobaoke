@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/url"
 	"os"
@@ -194,14 +193,14 @@ func BrowserLogin() string {
 	}
 
 	// 运行任务
-
-	err = c.Run(ctxt, getQrcode())
+	var img string
+	err = c.Run(ctxt, getQrcode(&img))
 	if err != nil {
 		log.Fatal("getQrcode", err)
 	}
-	imgbyte, _ := ioutil.ReadFile("123.png")
 	browserRun = 1
-	return base64.StdEncoding.EncodeToString(imgbyte)
+	log.Println("输出测试 ", img)
+	return img
 }
 func BrowserHandler(a string, b ...interface{}) {
 	log.Printf(a, b...)
@@ -213,8 +212,8 @@ func BrowserHandler(a string, b ...interface{}) {
 	}
 
 }
-func getQrcode() chromedp.Tasks {
-	var img []byte
+func getQrcode(img *string) chromedp.Tasks {
+
 	return chromedp.Tasks{
 		chromedp.Navigate(`https://www.alimama.com/member/login.htm?forward=http%3A%2F%2Fpub.alimama.com%2Fmyunion.htm%3Fspm%3Da219t.7900221%2F1.a214tr8.2.446dfb5b8vg0Sx`),
 		chromedp.WaitVisible(`.mm-logo`, chromedp.ByQuery),
@@ -236,14 +235,14 @@ func getQrcode() chromedp.Tasks {
 					}
 					res, _, err := runtime.Evaluate(`
 							function test (){
-								document.querySelector("#J_LoginBox").className.indexOf("module-quick") == -1 && (document.querySelector(".login-switch .quick").click());
+								document.querySelector("#J_LoginBox") && document.querySelector("#J_LoginBox").className && document.querySelector("#J_LoginBox").className.indexOf("module-quick") == -1 && (document.querySelector(".login-switch .quick").click());
 								if (!document.querySelector("#J_QRCodeImg img")){return 0}
 								if (document.querySelector("#J_QRCodeImg img").naturalWidth==0){return 0}
 								if (document.querySelector("#J_QRCodeImg img").naturalHeight==0){return 0}
 								if (document.querySelector("#J_QRCodeImg img").width==0){return 0}
 								if (document.querySelector("#J_QRCodeImg img").height==0){return 0}
 								var img = document.querySelector("#J_QRCodeImg img");
-								return '{"width":'+img.width+',"height":'+img.height+'}'
+								return '{"width":'+img.width+',"height":'+img.height+',"src":"'+img.src+'"}'
 							}
 							test()
 						`).WithContextID(runtime.ExecutionContextID(cid)).Do(z, h)
@@ -255,6 +254,7 @@ func getQrcode() chromedp.Tasks {
 						continue
 					}
 					//
+					*img = string(res.Value)
 					log.Println("二维码输出成功", string(res.Value), v.Frame.Name)
 					goto ForEnd
 				}
@@ -262,10 +262,6 @@ func getQrcode() chromedp.Tasks {
 			}
 		ForEnd:
 			return nil
-		}),
-		chromedp.Screenshot(".panel iframe[name='taobaoLoginIfr']", &img, chromedp.ByQuery),
-		chromedp.ActionFunc(func(z context.Context, h cdp.Executor) error {
-			return ioutil.WriteFile("123.png", img, 0644)
 		}),
 	}
 }
@@ -336,7 +332,7 @@ func BrowserCheckLogin() (status bool, msg string) {
 	}
 	// 循环判断网址是否是登陆成功后的网址
 	site = strings.Replace(site, "https://", "http://", -1)
-	if site[:34] == "http://pub.alimama.com/myunion.htm" || site[:35] == "https://pub.alimama.com/myunion.htm" {
+	if site[:34] == "http://pub.alimama.com/myunion.htm" {
 		err = c.Run(ctxt, getcookies())
 		if err != nil {
 			log.Fatal(err)
